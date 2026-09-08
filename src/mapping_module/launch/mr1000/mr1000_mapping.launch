@@ -1,0 +1,18 @@
+<launch>
+    <node name="mapping_module" pkg="mapping_module" type="mapping_module_node" output="screen">
+        <rosparam file="$(find mapping_module)/config/mr1000/mapping_config.yaml" command="load" />
+    </node>
+    <node pkg="tf" type="static_transform_publisher" name="odom_to_map_broadcaster"
+        args="0 0 0 0 0 0 odom_gt map  100" />
+
+    <!-- <node name="global_costmaper_node" pkg="mapping_module" type="global_costmaper_node"
+        output="screen">
+        <param name="world_frame" type="string" value="map" />
+        <param name="footprint_frame" type="string" value="base_link" />
+        <param name="lidar_frame" type="string" value="base" />
+    </node> -->
+
+
+    <node name="rviz1" pkg="rviz" type="rvi`z"
+        args="-d $(find mapping_module)/rviz/mapping_module.rviz" />
+</launch>

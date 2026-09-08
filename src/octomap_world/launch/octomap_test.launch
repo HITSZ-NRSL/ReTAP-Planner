@@ -1,0 +1,15 @@
+<launch>
+	<node name="publish_loaded_octree" pkg="octomap_world" type="publish_loaded_octree_node"
+		output="screen">
+		<param name="octo_topic" type="string" value="/global_map" />
+		<param name="octo_path" type="string" value="/home/xxx/tmp/test_in.bt" />
+		<param name="map_frame" type="string" value="map" />
+	</node>
+	<!-- <node name="save_subscribed_octree" pkg="octomap_world" type="save_subscribed_octree_node"
+	output="screen">
+		<param name="octo_topic" type="string" value="/global_map" />
+		<param name="octo_path" type="string" value="/home/xxx
+		/tmp/test_out2.bt" />
+	</node> -->
+	<node name="rviz1" pkg="rviz" type="rviz" args="-d $(find octomap_world)/rviz/default.rviz" />
+</launch>

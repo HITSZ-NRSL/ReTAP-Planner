@@ -1,42 +1,79 @@
-## [IEEE T-RO 2025]	Real-Time Multi-Level Terrain-Aware Path Planning for Ground Mobile Robots in Large-Scale Rough Terrains
+# ReTAP: terrain-aware navigation for a mobile robot
+## This code is designed for autonomous navigation of mobile robot on terrain. The main algorithm has been published on IEEE Transactions on Robotics
 
-This repository contains code for Real-Time Multi-Level Terrain-Aware Path Planning for Ground Mobile Robots in Large-Scale Rough Terrains, which is published by IEEE Transactions on Robotics, 2025.
+**Paper Information**: Yuxiang Li, Kun Chen, Yifei Wang, Weifan Zhang, Jiancheng Wang, Haoyao Chen, Yunhui Liu, Real-Time Multi-Level Terrain-Aware Path Planning for Ground Mobile Robots in Large-Scale Rough Terrains, IEEE Transactions on Robotics, 2025. 
 
-### 1. Dependency
-- ROS noetic (tested)
-- Basic libraries for common SLAM (e.g. openCV 4, pcl-1.10, ceres-solver-1.14 etc.)
+---
 
-### 2. Using Docker (Recommended)
+## Framework Overview
 
-#### 2.1 Build Docker Image
-First, navigate to your workspace and build the Docker image:
-
-#### 2.2 Run Docker Container
+![Framework](doc/Framework.png)
 
 
-#### 2.3 Run Examples in Docker
+## Prerequisites
 
-**Note:** Make sure to place your rosbag files in a location accessible to the container, or mount additional directories when starting the container.
+- **OS**: Ubuntu 18.04 / 20.04
+- **ROS**: Melodic / Noetic
+- **Compiler**: GCC 7+ with C++14 support
 
-### 3. Run Examples (Local Installation)
+### Dependencies
 
-### 4.  Acknowledgements
-Funding:
-
-### 5.  Citation
-If you use our work, please cite:
+```bash
+# System libraries
+sudo apt install libompl-dev libpcl-dev libopencv-dev \
+  libusb-dev binutils-dev
 ```
-@ARTICLE{11027468,
-  author={Li, Yuxiang and Chen, Kun and Wang, Yifei and Zhang, Weifan and Wang, Jiancheng and Chen, Haoyao and Liu, Yunhui},
-  journal={IEEE Transactions on Robotics}, 
-  title={Real-Time Multilevel Terrain-Aware Path Planning for Ground Mobile Robots in Large-Scale Rough Terrains}, 
+
+---
+
+## Build
+
+### 1. Build QuickHull
+
+```bash
+cd src/path_planning/lib/qhull/build
+cmake ..
+make -j
+```
+
+### 2. Build Workspace
+
+```bash
+cd /path/to/modules-mapping-me
+catkin_make -DBACKWARD_HAS_BFD=0
+source devel/setup.bash
+```
+
+---
+
+## Quick Start
+
+```bash
+# 1. Ensure that the lidar_topic, odom_topic, and other relevant parameters are ready in mapping_module/config & mapping_module/launch.
+
+# 2. Launch mapping module
+roslaunch mapping_module mr1000_mapping.launch
+
+# 3. Launch global planning
+roslaunch path_planning global_planning_exp.launch
+
+# 4. Launch local planning with Hybrid A*
+roslaunch path_planning local_planning_hybrid_astar_exp.launch
+```
+
+## Citation
+
+If you use this work in your research, please cite:
+
+```bibtex
+@article{li2025realtime,
+  title={Real-Time Multi-Level Terrain-Aware Path Planning for 
+         Ground Mobile Robots in Large-Scale Rough Terrains},
+  author={Li, Yuxiang and Chen, Kun and Wang, Yifei and Zhang, Weifan 
+          and Wang, Jiancheng and Chen, Haoyao and Liu, Yunhui},
+  journal={IEEE Transactions on Robotics},
   year={2025},
-  volume={41},
-  number={},
-  pages={4159-4179},
-  keywords={Path planning;Estimation;Navigation;Three-dimensional displays;Collision avoidance;Stability criteria;Real-time systems;Terrain mapping;Configuration-stability estimation;path planning;rough terrain;terrain analysis},
-  doi={10.1109/TRO.2025.3577015}}
+}
 ```
-## LICENSE
-The source code is released under GPLv3 license.
+
 

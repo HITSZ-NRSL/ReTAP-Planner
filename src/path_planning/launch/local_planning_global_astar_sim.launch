@@ -1,0 +1,20 @@
+<launch>
+	<!-- provide configuration planning for global path from astar -->
+	<node name="local_planning_node" pkg="path_planning" type="local_planning_node" output="screen">
+		<param name="map_frame" value="map" />
+		<param name="lookahead_distance" value="100" />
+		<param name="debug" value="false"/>
+		<param name="global_mode" value="true"/>
+
+		<param name="base_footprint_frame" value="base_link"/>
+		<param name="track_width" value="0.075"/>
+		<param name="track_length" value="0.672"/>
+		<param name="track_separation" value="0.329"/>
+		<param name="flipper_width" value="0.040"/>
+		<param name="flipper_length" value="0.192"/>
+		<param name="flipper_separation" value="0.45"/>
+		<param name="costmap" value="false"/>
+		<remap from="local_planning/pose_array_input" to="/next_base_path"/>
+		<remap from="local_planning/pose_array_output" to="/next_base_path/config"/>
+	</node>
+</launch>

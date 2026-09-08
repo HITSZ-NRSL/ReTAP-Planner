@@ -1,0 +1,4 @@
+visualization_msgs/Marker point_array
+---
+bool status
+std_msgs/Int32MultiArray traversibility_array

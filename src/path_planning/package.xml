@@ -1,0 +1,38 @@
+<package format="3">
+  <name>path_planning</name>
+  <version>0.0.1</version>
+  <description>
+     path planning for slugcat robot 
+  </description>
+
+  <license>BSD</license>
+  <author email="xxxxx@qq.com">Liyx</author>
+  <maintainer email="xxxxx@qq.com">Liyx</maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>octomap_msgs</build_depend>
+  <build_depend>octomap</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>mapping_module</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>visualization_msgs</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_depend>backward_ros</build_depend>
+
+  <exec_depend>octomap_msgs</exec_depend>
+  <exec_depend>octomap</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>mapping_module</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>tf2</exec_depend>
+  <exec_depend>backward_ros</exec_depend>
+
+  <export>
+  </export>
+</package>

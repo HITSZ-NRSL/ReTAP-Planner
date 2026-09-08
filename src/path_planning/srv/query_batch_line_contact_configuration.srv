@@ -1,0 +1,13 @@
+geometry_msgs/Point position
+geometry_msgs/Quaternion orientation
+---
+bool status
+std_msgs/Float32MultiArray front_flipper_angle_array
+std_msgs/Float32MultiArray rear_flipper_angle_array
+std_msgs/Float32MultiArray pitch_array
+std_msgs/Float32MultiArray height_array
+std_msgs/Float32MultiArray front_base_contact_array
+std_msgs/Float32MultiArray rear_base_contact_array
+std_msgs/Float32MultiArray front_flipper_contact_array
+std_msgs/Float32MultiArray rear_flipper_contact_array
+std_msgs/Int8MultiArray valid_array

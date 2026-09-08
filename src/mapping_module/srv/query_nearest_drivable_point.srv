@@ -1,0 +1,4 @@
+geometry_msgs/Point query_point
+---
+bool success
+geometry_msgs/Point result_point

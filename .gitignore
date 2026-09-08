@@ -1,0 +1,15 @@
+/build
+data/
+devel/
+bags/
+logs/
+meshes/
+.catkin_tools/*
+.catkin_tools
+.vscode
+tmpt/
+.clang-format
+note.md
+src/ouster-gazebo-simulation
+src/path_planning/lib/qhull/build/*
+src/path_planning/lib/qhull/build

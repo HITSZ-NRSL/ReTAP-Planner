@@ -1,0 +1,18 @@
+<launch>
+	<param name="use_sim_time" value="false" />
+	<arg name="rviz" default="true" />
+	<node name="mapping_module" pkg="mapping_module" type="mapping_module_node" output="screen">
+		<rosparam file="$(find mapping_module)/config/slugcat/fastlio_config_exp.yaml" command="load" />
+	</node>
+
+	<node pkg="tf" type="static_transform_publisher" name="map_to_init_broadcaster" args="0 0 0 0 0 0 map base_init 100" />
+	<node pkg="tf" type="static_transform_publisher" name="base_to_base_link_broadcaster" args="0 0 0 0 0 0 base base_link 100" />
+
+	<group if="$(arg rviz)">
+		<node name="rviz_local" pkg="rviz" type="rviz"  respawn="true" 
+					args="-d $(find mapping_module)/rviz/fast_lio_local.rviz"/>
+		<node name="rviz_global" pkg="rviz" type="rviz" respawn="true"
+					args="-d $(find mapping_module)/rviz/fast_lio_global.rviz" />
+	</group>
+</launch>
+

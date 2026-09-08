@@ -1,0 +1,370 @@
+#include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Twist.h>
+#include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <ros/ros.h>
+#include <tf/tf.h>
+#include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
+#include <visualization_msgs/Marker.h>
+
+#include <Eigen/Dense>
+#include <mutex>
+#include <thread>
+#define BACKWARD_HAS_BFD 1
+#include <backward_ros/backward.hpp>
+
+std::string map_frame_ = "map";
+std::string base_footprint_frame_ = "base_link";
+std::mutex mutex;
+nav_msgs::Path current_path, last_path;
+ros::Publisher pubNearestPoint, pubMarker, pubLastPath, pubTFPath;
+std::vector<Eigen::Isometry3d> tf_list;
+std::string folder_path;
+
+bool getBasePoseTF(tf::StampedTransform *pose, ros::Time timestamp) {
+  static tf::TransformListener listener;
+  try {
+    listener.waitForTransform(map_frame_, base_footprint_frame_, timestamp,
+                              ros::Duration(0.01));
+    listener.lookupTransform(map_frame_, base_footprint_frame_, timestamp,
+                             *pose);
+  } catch (...) {
+    ROS_ERROR("Listen TF [%.6f] (%s -> %s) timeout!", timestamp.toSec(),
+              map_frame_.c_str(), base_footprint_frame_.c_str());
+    return false;
+  }
+  return true;
+}
+
+bool getBasePoseEigen(Eigen::Isometry3d *pose, ros::Time timestamp) {
+  tf::StampedTransform lidar_transform_tf;
+  if (!getBasePoseTF(&lidar_transform_tf, timestamp)) {
+    return false;
+  }
+  tf::transformTFToEigen(lidar_transform_tf, *pose);
+
+  return true;
+}
+
+std::pair<double, int> getNereastPoseFromPath(Eigen::Isometry3d &pose,
+                                              nav_msgs::Path &path) {
+  Eigen::Vector3d curr_position = pose.translation();
+  double min_dis = 1e9;
+  int nereast_index = 1000;
+  for (int i = 0; i < path.poses.size(); i++) {
+    auto p = path.poses[i];
+    Eigen::Vector3d planned_position(p.pose.position.x, p.pose.position.y,
+                                     p.pose.position.z);
+    Eigen::Vector3d dis_vec = planned_position - curr_position;
+    double dis = dis_vec.norm();
+    if (dis < min_dis) {
+      min_dis = dis;
+      nereast_index = i;
+    }
+  }
+  return std::make_pair(min_dis, nereast_index);
+}
+
+std::pair<double, int> getNereastPoseFromPath(geometry_msgs::PoseStamped &pose,
+                                              nav_msgs::Path &path) {
+  Eigen::Vector3d curr_position = Eigen::Vector3d(
+      pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+
+  double min_dis = 1e9;
+  int nereast_index = 1000;
+  for (int i = 0; i < path.poses.size(); i++) {
+    auto p = path.poses[i];
+    Eigen::Vector3d planned_position(p.pose.position.x, p.pose.position.y,
+                                     p.pose.position.z);
+    Eigen::Vector3d dis_vec = planned_position - curr_position;
+    double dis = dis_vec.norm();
+    if (dis < min_dis) {
+      min_dis = dis;
+      nereast_index = i;
+    }
+  }
+  return std::make_pair(min_dis, nereast_index);
+}
+
+std::pair<double, int> getNereastPoseFromTFList(
+    geometry_msgs::PoseStamped &pose, std::vector<Eigen::Isometry3d> &_tf_list,
+    int start_id = 0) {
+  Eigen::Vector3d curr_position = Eigen::Vector3d(
+      pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+
+  double min_dis = 1e9;
+  int nereast_index = -1;
+  for (int i = start_id; i < _tf_list.size(); i++) {
+    Eigen::Vector3d dis_vec = _tf_list[i].translation() - curr_position;
+    dis_vec.z() = 0;
+    double dis = dis_vec.norm();
+    if (dis < min_dis) {
+      min_dis = dis;
+      nereast_index = i;
+    }
+  }
+  return std::make_pair(min_dis, nereast_index);
+}
+
+void publishMarkerMsg(std::vector<Eigen::Isometry3d> &waypts,
+                      nav_msgs::Path &path) {
+  if (waypts.size() == 0) return;
+  visualization_msgs::Marker marker_msg;
+  marker_msg.ns = "line_extraction";
+  marker_msg.id = 0;
+  marker_msg.type = visualization_msgs::Marker::LINE_LIST;
+  marker_msg.scale.x = 0.02;
+  marker_msg.color.r = 1.0;
+  marker_msg.color.g = 0.0;
+  marker_msg.color.b = 0.0;
+  marker_msg.color.a = 1.0;
+
+  for (int i = 0; i < waypts.size(); i++) {
+    geometry_msgs::Point p_start;
+    p_start.x = waypts[i].translation().x();
+    p_start.y = waypts[i].translation().y();
+    p_start.z = waypts[i].translation().z();
+    marker_msg.points.push_back(p_start);
+    geometry_msgs::Point p_end;
+    p_end.x = path.poses[i].pose.position.x;
+    p_end.y = path.poses[i].pose.position.y;
+    p_end.z = path.poses[i].pose.position.z;
+    marker_msg.points.push_back(p_end);
+  }
+  marker_msg.header.frame_id = "map";
+  marker_msg.header.stamp = ros::Time::now();
+  pubMarker.publish(marker_msg);
+  pubLastPath.publish(path);
+}
+
+void publishTFPath(std::vector<Eigen::Isometry3d> waypts) {
+  nav_msgs::Path path;
+  path.header.frame_id = "map";
+  path.header.stamp = ros::Time::now();
+
+  for (int i = 0; i < waypts.size(); i++) {
+    geometry_msgs::PoseStamped p;
+    p.pose.position.x = waypts[i].translation().x();
+    p.pose.position.y = waypts[i].translation().y();
+    p.pose.position.z = waypts[i].translation().z();
+    Eigen::Quaterniond q(waypts[i].rotation());
+    p.pose.orientation.w = q.w();
+    p.pose.orientation.x = q.x();
+    p.pose.orientation.y = q.y();
+    p.pose.orientation.z = q.z();
+    path.poses.push_back(p);
+  }
+  pubTFPath.publish(path);
+}
+
+std::string stampToDateString(const ros::WallTime &stamp,
+                              const std::string format = "%Y-%m-%d_%H-%M-%S") {
+  const int output_size = 100;
+  char output[output_size];
+  std::time_t raw_time = static_cast<time_t>(stamp.sec);
+  struct tm *timeinfo = localtime(&raw_time);  // NO_LINT
+  std::strftime(output, output_size, format.c_str(), timeinfo);
+  std::stringstream ss;
+  ss << std::setw(9) << std::setfill('0') << stamp.nsec;
+  const size_t fractional_second_digits = 4;
+
+  std::string ret =
+      std::string(output) + "_" + ss.str().substr(0, fractional_second_digits);
+  return ret;
+}
+
+void writeFileHeader(std::string file_name) {
+  std::ofstream out(file_name);  // 覆盖写入
+  std::stringstream ss;
+  ss << "Distance\t"
+     << "Planned Z\t"
+     << "Real Z\t"
+     << "Delta Z\t"
+     << "Offset Z\t"
+     << "Delta Z'\t"
+     << "Planned Inclination\t"
+     << "Real Inclination\t"
+     << "Intersection Angle\t"
+     << "Acc Z\t"
+     << "Timecost\t"
+     << "Planned FFlipper\t"
+     << "Planned RFlipper\t"
+     << "Real FFlipper\t"
+     << "Real RFlipper\n";
+  if (!out.fail()) {
+    out << ss.str();
+  } else {
+    ROS_ERROR_STREAM("<writeFileHeader>: Open file failed: " << file_name);
+  }
+  out.close();
+  std::cout << "<writeFileHeader>: \n" << ss.str();
+}
+
+void writeFileRecords(std::vector<Eigen::Isometry3d> &waypts,
+                      nav_msgs::Path &path) {
+  std::ofstream out(folder_path, std::ios_base::app);  // 追加写入
+  std::stringstream ss;
+  for (int i = 0; i < waypts.size(); i++) {
+    auto pathpts = path.poses[i].pose;
+    Eigen::Vector3d zc = waypts[i].rotation() * Eigen::Vector3d::UnitZ();
+    Eigen::Vector3d zm =
+        Eigen::Quaterniond(pathpts.orientation.w, pathpts.orientation.x,
+                           pathpts.orientation.y, pathpts.orientation.z)
+            .toRotationMatrix() *
+        Eigen::Vector3d::UnitZ();
+    if (zc.z() < 0) zc *= -1;
+    if (zm.z() < 0) zm *= -1;
+
+    float offset_z = waypts[i].translation().z() - pathpts.position.z - 0.1;
+
+    ss.precision(4);
+    ss << 0 << "\t" << 0 << "\t" << 0 << "\t" << 0 << "\t" << 0 << "\t"
+       << offset_z << "\t" << acos(Eigen::Vector3d::UnitZ().dot(zc)) << "\t"
+       << acos(Eigen::Vector3d::UnitZ().dot(zm)) << "\t" << acos(zc.dot(zm))
+       << "\t" << 0 << "\t" << 0 << "\t" << 0 << "\t" << 0 << "\t" << 0 << "\t"
+       << 0 << "\n";
+  }
+
+  if (!out.fail()) {
+    out << ss.str();
+  } else {
+    ROS_ERROR_STREAM("<writeFileHeader>: Open file failed: " << folder_path);
+  }
+  out.close();
+
+  std::cout << "<writeFileRecords>: \n" << ss.str();
+}
+
+void localPathCallback(const nav_msgs::PathConstPtr msg) {
+  last_path = current_path;
+  current_path = *msg;
+
+  if (last_path.poses.size() == 0) return;
+
+  ros::WallTime t1 = ros::WallTime::now();
+  std::lock_guard<std::mutex> lock(mutex);
+  std::vector<Eigen::Isometry3d> matched_waypts;
+  int path_end_id = last_path.poses.size() - 1;
+  int tf_end_id = 0;
+  // 遍历last_path, 对每个路点在tf中找最近邻
+  for (int i = 0; i < last_path.poses.size(); i++) {
+    std::pair<double, int> m  // 遍历tf, 找到最近的
+        = getNereastPoseFromTFList(last_path.poses[i], tf_list, tf_end_id);
+
+    // 如果最近的距离超过0.1或id为-1则匹配失败
+    if (m.second == -1 || m.first > 0.05) {
+      path_end_id = i;
+      break;
+    }
+    matched_waypts.push_back(tf_list[m.second]);
+    tf_end_id = m.second > 5 ? m.second - 5 : 0;
+  }
+
+  publishTFPath(tf_list);
+  std::vector<Eigen::Isometry3d> tmp_list;
+  // tmp_list.assign(tf_list.begin() + end_index, tf_list.end());
+  for (int i = tf_end_id; i < tf_list.size(); i++) {
+    tmp_list.push_back(tf_list[i]);
+  }
+  tf_list = tmp_list;
+  publishMarkerMsg(matched_waypts, last_path);
+  // last_path 与 matched_waypts 的前 end_index 个是匹配的, 计算 delta Z 和夹角
+  if (matched_waypts.size() > 2) {
+    writeFileRecords(matched_waypts, last_path);
+  }
+  std::cout << "matched_waypts: " << matched_waypts.size()
+            << ", timecost: " << (ros::WallTime::now() - t1).toSec() * 1000
+            << "ms\n";
+  if (0) {
+    geometry_msgs::PoseStamped nearest_pose;
+    bool valid_flag = false;
+    // 在 path中找到xy最近邻的
+    Eigen::Isometry3d pose;
+    std::pair<double, int> m1 = getNereastPoseFromPath(pose, current_path);
+    std::pair<double, int> m2 = getNereastPoseFromPath(pose, last_path);
+    if (m1.first < m2.first) {  // 取最近的
+      if (m1.second < 1000) {   // 有效
+        nearest_pose = current_path.poses.at(m1.second);
+        valid_flag = true;
+      }
+    } else {
+      if (m2.second < 1000) {  // 有效
+        nearest_pose = last_path.poses.at(m2.second);
+        valid_flag = true;
+      }
+    }
+
+    if (valid_flag) {
+      geometry_msgs::PointStamped p;
+      p.header.frame_id = map_frame_;
+      p.header.stamp = ros::Time::now();
+      p.point = nearest_pose.pose.position;
+      pubNearestPoint.publish(p);
+
+      double delta_z = pose.translation().z() -
+                       nearest_pose.pose.position.z;  // 计算高度偏差、角度偏差
+      Eigen::Quaterniond q1(pose.rotation());
+      Eigen::Quaterniond q2(
+          nearest_pose.pose.orientation.w, nearest_pose.pose.orientation.x,
+          nearest_pose.pose.orientation.y, nearest_pose.pose.orientation.z);
+      Eigen::Vector3d v1 = q1.toRotationMatrix() * Eigen::Vector3d::UnitZ();
+      Eigen::Vector3d v2 = q2.toRotationMatrix() * Eigen::Vector3d::UnitZ();
+
+      double theta = acos(v1.dot(v2));
+    }
+  }
+}
+
+int main(int argc, char **argv) {
+  backward::SignalHandling sh;
+  ros::init(argc, argv, "local_path_evaluation_node");
+  ros::NodeHandle nh;
+
+  ros::Subscriber subGlobalPath =
+      nh.subscribe("local_planning/path", 1, localPathCallback);
+
+  pubNearestPoint = nh.advertise<geometry_msgs::PointStamped>(
+      "local_planning/nearest_point", 1);
+
+  pubMarker = nh.advertise<visualization_msgs::Marker>(
+      "matched_waypoint_connection", 1);
+
+  pubLastPath = nh.advertise<nav_msgs::Path>("local_planning/last_path", 1);
+  pubTFPath = nh.advertise<nav_msgs::Path>("tf_history_path", 1);
+
+  {
+    folder_path =
+        "/home/liyx/gitlab-related/modules-mapping/data/local_planning/" +
+        stampToDateString(ros::WallTime::now()) + "_field";
+    std::string cmd = "mkdir -p " + folder_path;
+    system(cmd.c_str());
+    std::cout << "cmd: " << cmd.c_str() << std::endl;
+
+    folder_path += "/record.txt";
+    writeFileHeader(folder_path);
+  }
+
+  ros::Rate rate(100);
+  while (ros::ok()) {
+    Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
+    if (getBasePoseEigen(&pose, ros::Time(0))) {
+      if (tf_list.size() == 0) {
+        std::lock_guard<std::mutex> lock(mutex);
+        tf_list.push_back(pose);
+      } else {
+        Eigen::Vector3d dis = pose.translation() - tf_list.back().translation();
+        dis.z() = 0;
+        if (dis.norm() >= 0.02) {  // record a pose every 5cm
+          std::lock_guard<std::mutex> lock(mutex);
+          tf_list.push_back(pose);
+        }
+      }
+    }
+    ros::spinOnce();
+    rate.sleep();
+  }
+}

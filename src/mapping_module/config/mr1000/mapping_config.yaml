@@ -1,0 +1,53 @@
+odom_topic: /odometry_lio
+map_frame: map
+lidar_frame: ouster_lidar
+lidar_range_max: 10
+lidar_range_min: 0.3
+# lidar_range: 40
+lidar_tf_dt: 1
+max_buffer_size: 2
+filling_radius: 0.4 # the radius of the hole to be filled initially
+frame_height: -0.38 # the height distance from lidar_frame to ground plane
+loop_enable: false
+loop_notify_topic: /loop_notify
+
+local_map:
+  octree_enable: true
+  lidar_topic: /os1_cloud_node/points
+  octree_resolution: 0.025
+  publish_frequency: 10
+  map_size: 20
+  map_height: 5 
+  octree_hit_probability: 0.7
+  octree_miss_probability: 0.4
+  update_free: 1 # 0: no free voxel, 1: all free voxel, 2: update free voxels only 1m near occ voxels
+  tsdf_enable: true
+
+global_map:
+  octree_enable: true
+  octree_resolution: 0.2
+  publish_frequency: 5
+  keyframe_topic: /os1_cloud_node/points
+  octree_hit_probability: 0.7
+  octree_miss_probability: 0.4
+  std_octree_enable: true
+  update_free: 2 # 0: no free voxel, 1: all free voxel, 2: update free voxels only 1m near occ voxels
+  tsdf_enable: true
+  terrain_enable: true
+
+terrain_evaluation:
+  roughness_threshold: 1
+  roughness_weight: 4
+  sparsity_threshold: 2
+  sparsity_weight: 5
+  slope_threshold: 3
+  slope_weight: 6
+  traversability_threshold: 7
+
+  neighbor_radius: 5 # n voxels
+  points_number_threshold: 20
+  collision_neighbor: 9 # 9: r=1, 17: r=2, 25: r=3 (voxels)
+  costmap_enable: true
+  costmap_frame: costmap
+  costmap_size: 4
+  costmap_height: 3.8

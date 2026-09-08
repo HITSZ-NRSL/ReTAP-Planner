@@ -1,0 +1,5 @@
+# request message
+int32 send_data_command
+---
+# response message
+string data_path

@@ -1,0 +1,19 @@
+<launch>
+	<!-- generate pointcloud ground truth of world -->
+	<node name="odom_to_tf_node" pkg="mapping_module" type="odom_to_tf_node" output="screen">
+		<param name="publish_tf" type="bool" value="true" />
+		<param name="source_topic" type="string" value="base_pose_ground_truth" />
+		<param name="source_frame" type="string" value="base_link" />
+		<param name="world_frame" type="string" value="world" />
+	</node>
+
+	<node pkg="tf" type="static_transform_publisher" name="odom_to_map_broadcaster" args="0 0 0 0 0 0 world map  100" /> 
+
+  <node name="frame_merger_node" pkg="path_planning" type="frame_merger_node"  output="screen">
+    <param name="file_path" type="string" 
+          value="/home/liyx/gitlab-related/modules-mapping/data/local_planning/terrain_xili.pcd" />
+  </node>
+
+	<node name="rviz_pcd" pkg="rviz" type="rviz" args="-d $(find path_planning)/rviz/test.rviz"/>
+
+</launch>

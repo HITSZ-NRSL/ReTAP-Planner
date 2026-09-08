@@ -1,0 +1,57 @@
+odom_topic: /xxxx # for loop test
+map_frame: map
+lidar_frame: base
+lidar_range_max: 10
+lidar_range_min: 0.3
+lidar_tf_dt: 1
+max_buffer_size: 2
+transformed_scan: false # If the scan is already in map frame, set it true.
+frame_height: -0.175 # -0.115 # the height distance from lidar_frame to ground plane
+filling_radius: 1 # the radius of the hole to be filled initially
+loop_enable: false
+loop_notify_topic: /loop_notify
+
+local_map:
+  octree_enable: true
+  lidar_topic: /cloud_registered_base
+  octree_resolution: 0.025
+  publish_frequency: 10
+  map_size: 20
+  map_height: 4
+  std_octree_enable: false
+  octree_hit_probability: 0.7
+  octree_miss_probability: 0.4
+  update_free: 0 # 0: no free voxel, 1: all free voxel, 2: update free voxels only 1m near occ voxels
+  tsdf_enable: true
+
+global_map:
+  octree_enable: true
+  pcd_enable: true
+  octree_resolution: 0.2
+  publish_frequency: 5
+  keyframe_topic: /cloud_registered_base
+  octree_hit_probability: 0.7
+  octree_miss_probability: 0.4
+  std_octree_enable: true
+  update_free: 2 # 0: no free voxel, 1: all free voxel, 2: update free voxels only 1m near occ voxels
+  tsdf_enable: true
+  terrain_enable: true
+
+terrain_evaluation:
+  slope_threshold: 0.65 # 37 deg
+  roughness_threshold: 0.5
+  sparsity_threshold: 0.7
+
+  slope_weight: 0.5
+  roughness_weight: 0.3
+  sparsity_weight: 0.2
+  traversability_weight: 2.3
+  traversability_threshold: 0.805 # 0.35x2.3->0.805
+
+  points_number_threshold: 20
+  neighbor_radius: 5 # n voxels
+  collision_neighbor: 9 # 9: r=1, 17: r=2, 25: r=3 (voxels)
+  costmap_enable: false
+  costmap_frame: costmap
+  costmap_size: 4
+  costmap_height: 3.8

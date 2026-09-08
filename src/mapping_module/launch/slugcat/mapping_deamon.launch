@@ -1,0 +1,7 @@
+<launch>
+	<node name="mapping_daemon_node" pkg="mapping_module" type="mapping_daemon_node" output="screen">
+		<param name="loop_notify_topic" type="string" value="/loop_notify" />
+		<param name="boot_script_path" type="string" value="/home/xxx/modules-mapping" />
+		<param name="kill_script_path" type="string" value="/home/xxx/modules-mapping" />
+	</node>
+</launch>

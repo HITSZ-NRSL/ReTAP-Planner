@@ -1,0 +1,241 @@
+#pragma once
+#include <math.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/surface/convex_hull.h>
+
+#include <algorithm>
+#include <functional>
+#include <vector>
+
+#include "libqhullcpp/Qhull.h"
+#include "libqhullcpp/QhullFacetList.h"
+
+template <typename Point>
+class QuickHull2D {
+  using vPoint = std::vector<Point>;
+
+ public:
+  QuickHull2D(vPoint vec) { input = vec; }
+
+  /* // Deprecated. 
+  // 对s[]中的n个点，提取凸包点存入ch[]，返回凸包点数v
+  // https://zhuanlan.zhihu.com/p/264334490
+  vPoint getConvexHull() {
+    auto s = input;
+    auto ch = input;
+    int n = input.size();
+    int v = 0;
+    for (int i = 0; i < n; i++) {
+      while (v > 1 &&
+             sgn(cross2(ch[v - 1] - ch[v - 2], s[i] - ch[v - 2])) <= 0) {
+        v -= 1;
+      }
+      ch[v++] = s[i];
+    }
+    int j = v;
+    for (int i = n - 2; i >= 0; i--) {
+      while (v > j &&
+             sgn(cross2(ch[v - 1] - ch[v - 2], s[i] - ch[v - 2])) <= 0) {
+        v -= 1;
+      }
+      ch[v++] = s[i];
+    }
+    if (n > 1) v -= 1;
+
+    ch.erase(ch.begin() + v, ch.end());
+    hull_quick = ch;
+    return hull_quick;
+  }
+  */
+
+  vPoint getConvexHull_Qhull() {
+    hull_quick.clear();
+    std::vector<double> allCoords;
+    for (int i = 0; i < input.size(); i++) {
+      allCoords.push_back(input[i].x());
+      allCoords.push_back(input[i].y());
+    }
+    double *buffer = new double[allCoords.size()];
+    memcpy(buffer, &allCoords[0], allCoords.size() * sizeof(double));
+
+    char inputComment2[] = "";
+    char qhullCommand2[] = "";
+
+    try {
+      orgQhull::Qhull qhull;
+      qhull.runQhull(inputComment2, 2, input.size(), buffer, qhullCommand2);
+      auto vertices = qhull.vertexList();
+      ROS_INFO("<getConvexHull_Qhull>: vertices = %d", (int)vertices.size());
+      for (auto p : vertices) {
+        double *coord = p.point().coordinates();
+        ROS_INFO("<getConvexHull_Qhull>: coord[%.3f, %.3f]", coord[0],
+                 coord[1]);
+        hull_quick.push_back(Point(coord[0], coord[1], 0));
+      }
+    } catch (...) {
+      ROS_ERROR("runQhull execption.");
+    }
+    ROS_INFO("<getConvexHull_Qhull>: fill hull_quick ok");
+    delete[] buffer;
+    ROS_INFO("<getConvexHull_Qhull>: delete buffer ok");
+    std::sort(hull_quick.begin(), hull_quick.end(), azimuthCmp);
+    return hull_quick;
+  }
+
+  /* // Deprecated. 维度设为3，提示缺少1个维度；设为2，段错误
+  vPoint getConvexHull_PCL() {
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    for (int i = 0; i < input.size(); i++) {
+      auto p = input[i];
+      cloud.push_back(pcl::PointXYZ(p.x(), p.y(), p.z()));
+    }
+    pcl::ConvexHull<pcl::PointXYZ> hull;
+    hull.setInputCloud(cloud.makeShared());
+    hull.setComputeAreaVolume(true);
+    hull.setDimension(3);
+    std::vector<pcl::Vertices> polygons;
+    pcl::PointCloud<pcl::PointXYZ> surface_hull;
+    hull.reconstruct(surface_hull, polygons);
+
+    hull_quick.clear();
+    for (int i = 0; i < surface_hull.size(); i++) {
+      auto p = surface_hull[i];
+      hull_quick.push_back(Point(p.x, p.y, p.z));
+    }
+  }
+*/
+
+  /* // Deprecated. 输入点数多时，会出现大量重复点
+  // https://blog.csdn.net/shungry/article/details/104342366
+  vPoint getQuickHull() {
+    hull_quick.clear();
+    int min_x = 0, max_x = 0;
+    for (int i = 0; i < input.size(); i++) {
+      if (input[i].x() < input[min_x].x()) {
+        min_x = i;
+      }
+      if (input[i].x() > input[max_x].x()) {
+        max_x = i;
+      }
+    }
+
+    hull_quick.push_back(input[min_x]);
+    hull_quick.push_back(input[max_x]);
+
+    vPoint left, right;
+    for (int i = 0; i < input.size(); i++) {
+      if (i == min_x || i == max_x) {
+        continue;
+      }
+      // int temp = get_sign(input[min_x], input[max_x], input[i]);
+      int temp = sgn(cross3(input[min_x], input[max_x], input[i]));
+      if (temp == 0) {
+        continue;
+      }
+      if (temp < 0) {
+        left.push_back(input[i]);
+      } else {
+        right.push_back(input[i]);
+      }
+    }
+    qhullrecur(right, input[min_x], input[max_x]);
+    qhullrecur(left, input[max_x], input[min_x]);
+
+    // auto last_ptr = std::unique(hull_quick.begin(), hull_quick.end());
+    // hull_quick.erase(last_ptr, hull_quick.end());
+    // std::sort(hull_quick.begin(), hull_quick.end(), azimuthCmp);
+    for (int i = 0; i < hull_quick.size(); i++) {
+      auto p = hull_quick[i];
+      ROS_INFO("<QuickHull2D::getHullVertices>: [%d] (%.3f, %.3f, %.3f)", i,
+               p.x(), p.y(), p.z());
+    }
+    return hull_quick;
+  }
+  */
+
+  double getHullArea() {
+    double s = 0;
+    for (int i = 0; i < hull_quick.size() - 1; i++) {
+      s += fabs(cross2(hull_quick[i], hull_quick[i + 1]));  // 叉积
+    }
+    return 0.5 * s;
+  }
+
+  // O(log(n))
+  bool inConvexPoly(Point p) {
+    int n = hull_quick.size();
+    for (int i = 0; i < n; i++) {
+      if (sgn(cross2((hull_quick[i] - p), (hull_quick[(i + 1) % n] - p))) < 0)
+        return false;
+      // else if (OnSeg(a, Line(p[i], p[(i + 1) % n])))
+      //   return 0;
+    }
+    return true;
+  }
+
+ private:
+  vPoint hull_quick;
+  vPoint input;
+
+  static bool azimuthCmp(Point a, Point b) {
+    if (atan2(a.y(), a.x()) != atan2(b.y(), b.x()))
+      return atan2(a.y(), a.x()) < atan2(b.y(), b.x());
+    else
+      return a.x() < b.x();
+  }
+
+  // c到ab线段的距离
+  double cross3(Point a, Point b, Point c) {
+    return (c.x() - a.x()) * (b.y() - a.y()) -
+           (c.y() - a.y()) * (b.x() - a.x());
+  }
+
+  double cross2(Point a, Point b) { return a.x() * b.y() - a.y() * b.x(); }
+
+  int sgn(double a) {
+    if (fabs(a) < 1e-3) return 0;
+    if (a > 0) return 1;
+    return -1;
+  }
+
+  // int get_sign(Point a, Point b, Point c) { return cross(a, b, c); }
+
+  // bool get_right(Point a, Point b, Point c) { return cross(a, b, c) > 0; }
+
+  double dist(Point a, Point b, Point c) { return fabs(cross3(a, b, c)); }
+
+  void qhullrecur(const vPoint &temp, Point a, Point b) {
+    if (temp.size() == 0) {
+      return;
+    }
+
+    int max_ind = -1;
+    int max_dis = 0;
+    for (int i = 0; i < temp.size(); i++) {
+      if (sgn(cross3(a, b, temp[i])) > 0) {  // get_right
+        if (max_dis < dist(a, b, temp[i])) {
+          max_ind = i;
+          max_dis = dist(a, b, temp[i]);
+        }
+      }
+    }
+
+    if (max_ind == -1) return;
+
+    Point c = temp[max_ind];
+    hull_quick.push_back(c);
+
+    vPoint acr, bcr;
+    for (int i = 0; i < temp.size(); i++) {
+      if (sgn(cross3(a, c, temp[i])) > 0) {  // get_right
+        acr.push_back(temp[i]);
+      }
+      if (sgn(cross3(c, b, temp[i])) > 0) {  // get_right
+        bcr.push_back(temp[i]);
+      }
+    }
+    qhullrecur(acr, a, c);
+    qhullrecur(bcr, c, b);
+  }
+};

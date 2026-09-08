@@ -1,0 +1,9 @@
+<launch>
+	<node name="global_planning_node" pkg="path_planning" type="global_planning_node" output="screen">
+		<param name="map_frame" value="map" />
+		<param name="base_footprint_frame" value="base_link" />
+		<param name="astar_hueristic_weight" value="1" />
+		<param name="astar_traversability_weight" value="1" />
+		<!-- <remap from="global_planning/pose_array" to="next_base_path"/> -->
+	</node>
+</launch>

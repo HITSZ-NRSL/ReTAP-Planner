@@ -1,0 +1,5 @@
+geometry_msgs/Point min_point
+geometry_msgs/Point max_point
+---
+geometry_msgs/Point root_point
+sensor_msgs/PointCloud2 pcd_in_bbox

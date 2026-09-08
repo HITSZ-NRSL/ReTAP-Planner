@@ -1,0 +1,6 @@
+# request message
+int32 send_data_command
+---
+# response message
+string GlobalMap_path
+string LocalMap_path
